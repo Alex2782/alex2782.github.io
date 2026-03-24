@@ -1,6 +1,17 @@
 
-Worker Script for https://dash.cloudflare.com/
 
+Configuration:
+
+```js
+const WORKER_URL = "https://godot-proxy.alex-hart-278.workers.dev/";
+
+const TARGET_BASE_URL = "https://godot-releases.nbg1.your-objectstorage.com/4.7-dev2/Godot_v4.7-dev2_export_templates.tpz";
+
+```
+
+---------
+
+Worker Script for https://dash.cloudflare.com/
 
 ```js
 
