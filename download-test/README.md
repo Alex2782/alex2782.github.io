@@ -2,7 +2,7 @@
 Worker Script for https://dash.cloudflare.com/
 
 
-```
+```js
 
 export default {
   async fetch(request, env, ctx) {
