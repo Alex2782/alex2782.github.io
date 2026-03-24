@@ -54,10 +54,13 @@
         // CONFIGURATION
         // Using relative paths so it works automatically on GitHub Pages
         const RANGES_JSON_URL = "ranges.json"; 
-        const TARGET_BASE_URL = "Godot_v4.7-dev2_export_templates.tpz";
 
-        // No proxy needed because files are hosted on the same origin (GitHub Pages)
-        const PROXY = "";
+        const PROXY = "https://corsproxy.io/?";
+        const TARGET_BASE_URL = "https://downloads.godotengine.org/?version=4.7&flavor=dev2&slug=export_templates.tpz&platform=templates";
+        
+        
+        //const PROXY = "";
+        //const TARGET_BASE_URL = "Godot_v4.7-dev2_export_templates.tpz";
 
         let rangeData = [];
 
