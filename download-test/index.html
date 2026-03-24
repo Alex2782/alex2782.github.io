@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godot Template Extractor</title>
+    <script src="https://unpkg.com/fflate"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+        .container { max-width: 800px; margin: 0 auto; }
+        pre { background: #000; padding: 15px; border-radius: 8px; border: 1px solid #444; font-size: 12px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; }
+        
+        h2 { color: #478cbf; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        label { font-weight: bold; display: block; margin-bottom: 8px; }
+        
+        select { padding: 12px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 100%; margin-bottom: 15px; font-size: 16px; }
+        button { padding: 12px 24px; cursor: pointer; background: #478cbf; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 16px; transition: background 0.2s; }
+        button:hover { background: #356a91; }
+        button:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
+        
+        .status-area { margin: 15px 0; font-weight: bold; }
+        .ready { color: #4caf50; }
+        .error { color: #f44336; }
+        .loading { color: #ff9800; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Godot 4.7-dev2 Template Extractor</h2>
+        <p>Select a specific template to download and extract it directly in your browser using HTTP Range Requests.</p>
+        
+        <div>
+            <label for="fileSelect">Select Template:</label>
+            <select id="fileSelect">
+                <option>Loading ranges.json...</option>
+            </select>
+        </div>
+        
+        <button id="btnDownload" disabled>Start Extraction</button>
+        
+        <div class="status-area">
+            Status: <span id="status" class="loading">Initializing...</span>
+        </div>
+        
+        <pre id="log">Console ready...</pre>
+    </div>
+
+    <script>
+        const btn = document.getElementById('btnDownload');
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        const fileSelect = document.getElementById('fileSelect');
+
+        // CONFIGURATION
+        // Using relative paths so it works automatically on GitHub Pages
+        const RANGES_JSON_URL = "ranges.json"; 
+        const TARGET_BASE_URL = "Godot_v4.7-dev2_export_templates.tpz";
+
+        // No proxy needed because files are hosted on the same origin (GitHub Pages)
+        const PROXY = "";
+
+        let rangeData = [];
+
+        function print(msg) { 
+            const timestamp = new Date().toLocaleTimeString();
+            log.textContent += `[${timestamp}] ${msg}\n`; 
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function setStatus(text, className) {
+            status.textContent = text;
+            status.className = className;
+        }
+
+        // 1. Load JSON configuration on startup
+        async function init() {
+            try {
+                const response = await fetch(RANGES_JSON_URL);
+                if (!response.ok) throw new Error("Could not load ranges.json.");
+                
+                rangeData = await response.json();
+                
+                fileSelect.innerHTML = "";
+                rangeData.forEach((item, index) => {
+                    const opt = document.createElement('option');
+                    opt.value = index;
+                    const sizeMB = (item.uncompressed_size / 1024 / 1024).toFixed(2);
+                    opt.textContent = `${item.name} (${sizeMB} MB)`;
+                    fileSelect.appendChild(opt);
+                });
+                
+                btn.disabled = false;
+                setStatus("Ready", "ready");
+                print("Configuration loaded. " + rangeData.length + " files available.");
+            } catch (e) {
+                setStatus("Error loading configuration", "error");
+                print("ERROR: " + e.message);
+            }
+        }
+
+        btn.onclick = async () => {
+            const fileInfo = rangeData[fileSelect.value];
+            btn.disabled = true;
+            log.textContent = ""; // Clear console for new task
+            setStatus("Processing...", "loading");
+            
+            try {
+                print(`Requesting: ${fileInfo.name}`);
+                
+                // Construct the Range Header
+                const rangeHeader = `bytes=${fileInfo.start}-${fileInfo.end}`;
+                print(`Range: ${rangeHeader}`);
+
+                const response = await fetch(PROXY + TARGET_BASE_URL, {
+                    headers: { 'Range': rangeHeader }
+                });
+
+                if (!response.ok && response.status !== 206) {
+                    throw new Error(`Server responded with status ${response.status}. Range requests might be blocked.`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const fullData = new Uint8Array(arrayBuffer);
+                print(`Received: ${(fullData.length / 1024).toFixed(1)} KB`);
+
+                // Parse Local File Header (ZIP Structure)
+                // Offset 26: Filename length (2 bytes)
+                // Offset 28: Extra field length (2 bytes)
+                const view = new DataView(fullData.buffer);
+                const nameLen = view.getUint16(26, true);
+                const extraLen = view.getUint16(28, true);
+                const dataStart = 30 + nameLen + extraLen;
+                
+                // Slice out the actual compressed data (Deflate payload)
+                const compressedPayload = fullData.slice(dataStart, dataStart + fileInfo.compressed_size);
+                print(`Extracting payload (starting at byte ${dataStart})...`);
+
+                // Decompress using fflate
+                fflate.inflate(compressedPayload, (err, decompressed) => {
+                    if (err) {
+                        print("Decompression error: " + err);
+                        setStatus("Extraction Failed", "error");
+                        btn.disabled = false;
+                        return;
+                    }
+
+                    print("Success! Creating download...");
+                    const blob = new Blob([decompressed], { type: "application/octet-stream" });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = fileInfo.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }, 100);
+                    
+                    print("Download started.");
+                    setStatus("Ready", "ready");
+                    btn.disabled = false;
+                });
+
+            } catch (e) {
+                print("CRITICAL ERROR: " + e.message);
+                setStatus("Network Error", "error");
+                btn.disabled = false;
+            }
+        };
+
+        init();
+    </script>
+</body>
+</html>
