@@ -55,10 +55,13 @@
         // Using relative paths so it works automatically on GitHub Pages
         const RANGES_JSON_URL = "ranges.json"; 
 
-        const PROXY = "https://corsproxy.io/?";
+        //const PROXY = "https://corsproxy.io/?";
+        // --> "error": "This content type is not allowed on the free plan. Upgrade at https://corsproxy.io/pricing/"
+
+        const PROXY = "https://api.allorigins.win/raw?url=";
         const TARGET_BASE_URL = "https://downloads.godotengine.org/?version=4.7&flavor=dev2&slug=export_templates.tpz&platform=templates";
         
-        
+
         //const PROXY = "";
         //const TARGET_BASE_URL = "Godot_v4.7-dev2_export_templates.tpz";
 
